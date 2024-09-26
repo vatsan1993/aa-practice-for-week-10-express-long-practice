@@ -1,10 +1,15 @@
 const express = require('express');
 const app = express();
+require('dotenv').config();
 
 const path = require('path');
-require('express-async-errors');
+// using simple package for error handling
+// require('express-async-errors');
 
 app.use(express.json());
+
+// importing routers
+let dogRouter = require('./routes/dogs');
 
 // logger
 app.use((req, res, next) => {
@@ -28,6 +33,9 @@ app.get('/', (req, res) => {
   );
 });
 
+// using the router
+app.use('/dogs', dogRouter);
+
 // For testing express.json middleware
 app.post('/test-json', (req, res, next) => {
   // send the body as JSON with a Content-Type header of "application/json"
@@ -37,14 +45,46 @@ app.post('/test-json', (req, res, next) => {
 });
 
 // For testing express-async-errors
-app.get('/test-error', async (req, res) => {
-  throw new Error('Hello World!');
+app.get('/test-error', async (req, res, next) => {
+  // throw new Error('Hello World!');
+  next(new Error('Hello World!'));
 });
 
 app.all('*', (req, res) => {
   let err = new Error("The requested resource couldn't be found.");
   err.statusCode = 404;
   throw err;
+  // next(err);
 });
-const port = 5001;
-app.listen(port, () => console.log('Server is listening on port', port));
+
+// setting custom error handling
+app.use((err, req, res, next) => {
+  if (err) {
+    console.log(err);
+    let jsonData;
+    if (process.env.NODE_ENV === 'development') {
+      jsonData = {
+        status: err.statusCode || 500,
+        message: err.message || 'Something went wrong',
+        stack: err.stack,
+      };
+    } else {
+      jsonData = {
+        status: err.statusCode || 500,
+        message: err.message || 'Something went wrong',
+      };
+    }
+    res.status(err.statusCode || 500).json(jsonData);
+  }
+  next();
+});
+const port = process.env.PORT || 5001;
+app.listen(port, () =>
+  console.log(
+    'Server is listening on port',
+    port,
+    'Running in',
+    process.env.NODE_ENV,
+    'environment'
+  )
+);
